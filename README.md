@@ -1,30 +1,45 @@
-# PharmaStat - 药学可视化统计软件
+# PharmaStat - Statistical Visualization Software
 
-药学数据可视化分析工具，支持柱状图、箱线图、量效曲线、相关性分析、热图等。
+Pharmaceutical data visualization and analysis tool with English UI and Chinese tooltip hints.
 
-## 功能
+## Features
 
-- **组间比较**: 柱状图+误差线、箱线图，自动t检验显著性标注
-- **量效曲线**: S型拟合，计算IC50/EC50
-- **相关性**: 散点图+回归直线，计算r值和p值
-- **热图**: 数据矩阵热力图可视化
+- **Group Comparison**: Bar+Error bars, Boxplot with automatic t-test significance markers
+- **Dose-Response**: Sigmoid fitting, IC50/EC50 calculation
+- **Correlation**: Scatter plot with regression line, r-value and p-value
+- **Heatmap**: Data matrix heatmap visualization
+- **Volcano Plot**: Differential expression analysis for genomics
 
-## 安装
+## Visualization
+
+- Matplotlib - Base plotting
+- Seaborn - Statistical visualization with beautiful themes
+- SciencePlots - Academic journal style
+
+## Installation
 
 ```bash
-pip install matplotlib pandas numpy scipy
+pip install matplotlib pandas numpy scipy seaborn SciencePlots
 ```
 
-## 使用
+## Usage
 
 ```bash
 python pharmastat.py
 ```
 
-## 依赖
+## Dependencies
 
 - Python 3.7+
 - matplotlib
 - pandas
 - numpy
 - scipy
+- seaborn
+- SciencePlots
+
+## Interface
+
+- All buttons and labels in English
+- Hover over any element to see Chinese tooltip hints
+- Group names: Control, Model, Low Dose, Mid Dose, High Dose, Positive
