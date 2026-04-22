@@ -38,7 +38,7 @@ GROUP_ORDER = ['Control', 'Model', 'Low Dose', 'Mid Dose', 'High Dose', 'Positiv
 
 
 class VolcanoGrid(ttk.Frame):
-    def __init__(self, parent, rows=20):
+    def __init__(self, parent, rows=500):
         super().__init__(parent, relief=tk.SUNKEN, borderwidth=1)
         self.rows = rows
         self.cells = {}
@@ -473,7 +473,7 @@ class ChartWindow:
     def __init__(self, title, width=8, height=6):
         self.top = tk.Toplevel()
         self.top.title(title)
-        self.top.geometry(f"{width}00x{height}00")
+        self.top.geometry("1000x800")
         
         self.fig = Figure(figsize=(width, height), dpi=100)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.top)
@@ -490,6 +490,10 @@ class ChartWindow:
         btn.pack(side=tk.LEFT, padx=5)
         add_tooltip(btn, 'Save PDF')
         
+        btn = ttk.Button(btn_frame, text='Print', command=self.print_chart)
+        btn.pack(side=tk.LEFT, padx=5)
+        add_tooltip(btn, 'Print Chart')
+        
     def save_png(self):
         filename = filedialog.asksaveasfilename(defaultextension='.png',
                                                filetypes=[('PNG图片', '*.png')])
@@ -504,6 +508,11 @@ class ChartWindow:
             self.fig.savefig(filename, dpi=300, bbox_inches='tight')
             messagebox.showinfo('成功', f'已保存到 {filename}')
         
+    def print_chart(self):
+        self.fig.savefig('temp_print.png', dpi=300)
+        import os
+        os.startfile('temp_print.png', 'print')
+                
     def clear(self):
         self.ax.clear()
         
@@ -565,32 +574,22 @@ class PharmaStatApp:
             for c in range(10):
                 self.heatmap_grid.cells[(r, c)].insert(0, f'{heatmap_data[r,c]:.1f}')
         
-        volcano_genes = [
-            ('GAPDH', 0.12, 0.85),
-            ('ACTB', 0.05, 0.72),
-            ('TNF', 2.5, 0.001),
-            ('IL6', 3.1, 0.0003),
-            ('IL1B', 2.8, 0.0008),
-            ('CXCL8', 1.9, 0.015),
-            ('CCL2', -2.3, 0.002),
-            ('CXCL10', -3.5, 0.0001),
-            ('IFNG', -1.8, 0.008),
-            ('IL10', -2.1, 0.004),
-            ('VEGFA', 1.5, 0.025),
-            ('EGFR', 0.8, 0.15),
-            ('TP53', -0.3, 0.65),
-            ('BAX', 0.2, 0.78),
-            ('BCL2', -0.15, 0.88),
-            ('CASP3', 0.4, 0.45),
-            ('MMP9', 2.2, 0.003),
-            ('MMP2', 1.6, 0.02),
-            ('COX2', 2.9, 0.0005),
-            ('NOS2', -1.5, 0.03),
+        np.random.seed(42)
+        gene_names = [
+            'GAPDH', 'ACTB', 'TNF', 'IL6', 'IL1B', 'CXCL8', 'CCL2', 'CXCL10', 'IFNG', 'IL10',
+            'VEGFA', 'EGFR', 'TP53', 'BAX', 'BCL2', 'CASP3', 'MMP9', 'MMP2', 'COX2', 'NOS2',
+            'IL4', 'IL5', 'IL13', 'CSF1', 'CSF2', 'CSF3', 'CXCL1', 'CXCL2', 'CXCL3', 'CXCL5',
+            'CXCL6', 'CXCL9', 'CXCL11', 'CXCL12', 'CXCL13', 'CXCL14', 'CXCL15', 'CXCL16', 'CCL1', 'CCL3',
+            'CCL4', 'CCL5', 'CCL6', 'CCL7', 'CCL8', 'CCL9', 'CCL11', 'CCL13', 'CCL14', 'CCL15',
+            'CCL16', 'CCL17', 'CCL18', 'CCL19', 'CCL20', 'CCL21', 'CCL22', 'CCL23', 'CCL24', 'CCL25',
         ]
-        for i, (gene, fc, pval) in enumerate(volcano_genes):
+        for i in range(500):
+            gene = gene_names[i % len(gene_names)] + f'_{i+1}'
+            log2fc = np.random.normal(0, 1.5)
+            pval = np.random.uniform(0, 1)
             self.volcano_grid.cells[(i, 0)].insert(0, gene)
-            self.volcano_grid.cells[(i, 1)].insert(0, str(fc))
-            self.volcano_grid.cells[(i, 2)].insert(0, str(pval))
+            self.volcano_grid.cells[(i, 1)].insert(0, f'{log2fc:.2f}')
+            self.volcano_grid.cells[(i, 2)].insert(0, f'{pval:.4f}')
         
     def setup_ui(self):
         self.notebook = ttk.Notebook(self.root)
@@ -862,7 +861,7 @@ class PharmaStatApp:
         self.volcano_grid_frame = ttk.Frame(self.canvas_volcano)
         self.canvas_volcano.create_window((0, 0), window=self.volcano_grid_frame, anchor=tk.NW)
         
-        self.volcano_grid = VolcanoGrid(self.volcano_grid_frame, rows=20)
+        self.volcano_grid = VolcanoGrid(self.volcano_grid_frame, rows=500)
         self.volcano_grid.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
         self.volcano_grid_frame.bind("<Configure>", lambda e: self.canvas_volcano.configure(scrollregion=self.canvas_volcano.bbox("all")))
@@ -885,9 +884,10 @@ class PharmaStatApp:
         add_tooltip(btn, 'Generate Volcano')
         
     def clear_volcano_data(self):
-        for r in range(self.volcano_grid.rows):
+        for r in range(500):
             for c in range(3):
-                self.volcano_grid.cells[(r, c)].delete(0, tk.END)
+                if (r, c) in self.volcano_grid.cells:
+                    self.volcano_grid.cells[(r, c)].delete(0, tk.END)
         
     def clear_group_data(self):
         for r in range(6):
