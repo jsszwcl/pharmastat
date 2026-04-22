@@ -13,6 +13,20 @@ matplotlib.use('TkAgg')
 
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
 plt.rcParams['axes.unicode_minus'] = False
+
+import seaborn as sns
+sns.set_theme(style="whitegrid", palette="muted", font_scale=1.1)
+
+plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
+plt.rcParams['axes.unicode_minus'] = False
+
+try:
+    plt.style.use('science')
+    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
+    plt.rcParams['axes.unicode_minus'] = False
+except:
+    pass
+
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import pandas as pd
@@ -20,9 +34,131 @@ import numpy as np
 from scipy import stats
 from scipy.optimize import curve_fit
 
-GROUP_ORDER = ['对照组', '模型组', '低剂量组', '中剂量组', '高剂量组', '阳性药组']
+GROUP_ORDER = ['Control', 'Model', 'Low Dose', 'Mid Dose', 'High Dose', 'Positive']
+
+
+class VolcanoGrid(ttk.Frame):
+    def __init__(self, parent, rows=20):
+        super().__init__(parent, relief=tk.SUNKEN, borderwidth=1)
+        self.rows = rows
+        self.cells = {}
+        self.setup_grid()
+        
+    def setup_grid(self):
+        headers = ['Gene Name', 'Log2FC', 'P-value']
+        for c, h in enumerate(headers):
+            ttk.Label(self, text=h, width=15, anchor='center', font=('Arial', 10, 'bold')).grid(row=0, column=c, padx=2, pady=3)
+            
+        for r in range(self.rows):
+            for c in range(3):
+                entry = ttk.Entry(self, width=15, justify='center')
+                entry.grid(row=r+1, column=c, padx=2, pady=2)
+                self.cells[(r, c)] = entry
+                
+    def add_row(self):
+        if self.rows >= 100:
+            return
+        self.rows += 1
+        r = self.rows - 1
+        for c in range(3):
+            entry = ttk.Entry(self, width=15, justify='center')
+            entry.grid(row=r+1, column=c, padx=2, pady=2)
+            self.cells[(r, c)] = entry
+            
+    def del_row(self):
+        if self.rows <= 1:
+            return
+        r = self.rows - 1
+        for c in range(3):
+            self.cells[(r, c)].grid_forget()
+            self.cells[(r, c)].destroy()
+            del self.cells[(r, c)]
+        self.rows -= 1
+        
+    def get_data(self):
+        genes = []
+        log2fcs = []
+        pvals = []
+        for r in range(self.rows):
+            gene = self.cells[(r, 0)].get().strip()
+            log2fc = self.cells[(r, 1)].get().strip()
+            pval = self.cells[(r, 2)].get().strip()
+            
+            if gene:
+                try:
+                    genes.append(gene)
+                    log2fcs.append(float(log2fc) if log2fc else 0)
+                    pvals.append(float(pval) if pval else 1)
+                except ValueError:
+                    pass
+        return genes, log2fcs, pvals
 GROUP_COLORS = ['#4CAF50', '#FF5722', '#2196F3', '#9C27B0', '#FF9800', '#795548']
 DEFAULT_INDICATORS = ['血压(mmHg)', '血糖(mmol/L)', '转氨酶(U/L)', '脏器系数(%)', '痛阈值(s)', '收缩力(mN)']
+
+GROUP_TOOLTIP = {
+    'Control': '对照组',
+    'Model': '模型组',
+    'Low Dose': '低剂量组',
+    'Mid Dose': '中剂量组',
+    'High Dose': '高剂量组',
+    'Positive': '阳性药组',
+}
+
+TOOLTIP_MAP = {
+    'Group': '组间比较',
+    'Dose-Response': '量效曲线',
+    'Correlation': '相关性分析',
+    'Heatmap': '热图',
+    'Indicator': '指标',
+    'Clear': '清空数据',
+    '+ Add Col': '添加样本列',
+    '- Del Col': '删除样本列',
+    'Bar+Error': '柱状图+误差线',
+    'Boxplot': '箱线图',
+    'Import CSV': '导入CSV文件',
+    'Export': '导出统计结果',
+    '+ Add Row': '添加一行',
+    '- Del Row': '删除一行',
+    'Generate Curve': '生成量效曲线',
+    'Scatter Plot': '散点图+回归',
+    '+ Add Row': '添加行',
+    '- Del Row': '删除行',
+    '+ Add Col': '添加列',
+    '- Del Col': '删除列',
+    'Generate': '生成热图',
+    'Save PNG': '保存为PNG图片',
+    'Save PDF': '保存为PDF文档',
+}
+
+def add_tooltip(widget, text_key):
+    tooltip_text = TOOLTIP_MAP.get(text_key, '')
+    ToolTip(widget, tooltip_text)
+
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tipwindow = None
+        self.widget.bind('<Enter>', self.show)
+        self.widget.bind('<Leave>', self.hide)
+        
+    def show(self, event=None):
+        if self.tipwindow or not self.text:
+            return
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_geometry(f'+{x}+{y}')
+        tw.wm_overrideredirect(True)
+        label = tk.Label(tw, text=self.text, justify=tk.LEFT,
+                      font=('Microsoft YaHei', 10), bg='#ffffe0', fg='#000000',
+                      relief=tk.SOLID, borderwidth=1, padx=5, pady=3)
+        label.pack()
+        
+    def hide(self, event=None):
+        if self.tipwindow:
+            self.tipwindow.destroy()
+            self.tipwindow = None
 
 
 class DataGrid(ttk.Frame):
@@ -34,14 +170,18 @@ class DataGrid(ttk.Frame):
         self.setup_grid()
         
     def setup_grid(self):
-        ttk.Label(self, text='样本→', font=('Arial', 9), width=8).grid(row=0, column=0, padx=2, pady=3)
+        ttk.Label(self, text='Sample→', font=('Arial', 9), width=8).grid(row=0, column=0, padx=2, pady=3)
         
         for c in range(self.cols):
             label = ttk.Label(self, text=f"#{c+1}", width=6, anchor='center', font=('Arial', 9))
             label.grid(row=0, column=c+1, padx=1, pady=3)
             
         for r in range(self.rows):
-            ttk.Label(self, text=GROUP_ORDER[r], width=10, anchor='w').grid(row=r+1, column=0, padx=2, pady=2)
+            label_text = GROUP_ORDER[r]
+            label = ttk.Label(self, text=label_text, width=10, anchor='w')
+            label.grid(row=r+1, column=0, padx=2, pady=2)
+            if label_text in GROUP_TOOLTIP:
+                ToolTip(label, GROUP_TOOLTIP[label_text])
             for c in range(self.cols):
                 entry = ttk.Entry(self, width=6, justify='center')
                 entry.grid(row=r+1, column=c+1, padx=1, pady=2)
@@ -104,7 +244,7 @@ class DoseResponseGrid(ttk.Frame):
         self.setup_grid()
         
     def setup_grid(self):
-        headers = ['剂量', '效应均值', '效应SD', '样本数']
+        headers = ['Dose', 'Effect Mean', 'Effect SD', 'N']
         for c, h in enumerate(headers):
             ttk.Label(self, text=h, width=12, anchor='center', font=('Arial', 10, 'bold')).grid(row=0, column=c, padx=2, pady=3)
             
@@ -175,9 +315,9 @@ class CorrelationGrid(ttk.Frame):
         self.setup_grid()
         
     def setup_grid(self):
-        ttk.Label(self, text='X变量', width=15, anchor='center', font=('Arial', 10, 'bold')).grid(row=0, column=0, padx=2, pady=3)
-        ttk.Label(self, text='Y变量', width=15, anchor='center', font=('Arial', 10, 'bold')).grid(row=0, column=1, padx=2, pady=3)
-        ttk.Label(self, text='分组(可选)', width=12, anchor='center', font=('Arial', 10, 'bold')).grid(row=0, column=2, padx=2, pady=3)
+        ttk.Label(self, text='X Variable', width=15, anchor='center', font=('Arial', 10, 'bold')).grid(row=0, column=0, padx=2, pady=3)
+        ttk.Label(self, text='Y Variable', width=15, anchor='center', font=('Arial', 10, 'bold')).grid(row=0, column=1, padx=2, pady=3)
+        ttk.Label(self, text='Group (Opt)', width=12, anchor='center', font=('Arial', 10, 'bold')).grid(row=0, column=2, padx=2, pady=3)
             
         for r in range(self.max_rows):
             for c in range(3):
@@ -244,7 +384,7 @@ class HeatmapGrid(ttk.Frame):
         self.setup_grid()
         
     def setup_grid(self):
-        ttk.Label(self, text='  热图数据矩阵  ', font=('Arial', 10, 'bold')).grid(row=0, column=0, columnspan=self.cols+1, pady=5)
+        ttk.Label(self, text='  Heatmap Data Matrix  ', font=('Arial', 10, 'bold')).grid(row=0, column=0, columnspan=self.cols+1, pady=5)
             
         for r in range(self.rows):
             ttk.Label(self, text=f"R{r+1}", width=4).grid(row=r+1, column=0, padx=1, pady=1)
@@ -342,8 +482,13 @@ class ChartWindow:
         
         btn_frame = ttk.Frame(self.top)
         btn_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Button(btn_frame, text='保存PNG', command=self.save_png).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text='保存PDF', command=self.save_pdf).pack(side=tk.LEFT, padx=5)
+        btn = ttk.Button(btn_frame, text='Save PNG', command=self.save_png)
+        btn.pack(side=tk.LEFT, padx=5)
+        add_tooltip(btn, 'Save PNG')
+        
+        btn = ttk.Button(btn_frame, text='Save PDF', command=self.save_pdf)
+        btn.pack(side=tk.LEFT, padx=5)
+        add_tooltip(btn, 'Save PDF')
         
     def save_png(self):
         filename = filedialog.asksaveasfilename(defaultextension='.png',
@@ -370,7 +515,7 @@ class ChartWindow:
 class PharmaStatApp:
     def __init__(self, root):
         self.root = root
-        self.root.title('PharmaStat - 药学可视化统计软件')
+        self.root.title('PharmaStat - Statistical Visualization')
         self.root.geometry('1200x800')
         
         self.current_indicator = tk.StringVar(value='血压(mmHg)')
@@ -379,6 +524,8 @@ class PharmaStatApp:
         self.corr_ylabel = tk.StringVar(value='Y变量')
         self.row_labels_var = tk.StringVar(value='')
         self.col_labels_var = tk.StringVar(value='')
+        self.volcano_fc_var = tk.StringVar(value='2')
+        self.volcano_pval_var = tk.StringVar(value='0.05')
         
         self.setup_ui()
         
@@ -386,12 +533,12 @@ class PharmaStatApp:
         
     def load_sample_data(self):
         samples = {
-            '对照组': [120, 122, 118, 125, 121, 119, 123, 124],
-            '模型组': [145, 148, 142, 150, 146, 144, 147, 149],
-            '低剂量组': [138, 140, 135, 142, 139, 136, 141, 137],
-            '中剂量组': [130, 128, 132, 125, 129, 131, 127, 126],
-            '高剂量组': [115, 118, 112, 120, 116, 114, 117, 119],
-            '阳性药组': [125, 128, 122, 126, 124, 127, 123, 121]
+            'Control': [120, 122, 118, 125, 121, 119, 123, 124],
+            'Model': [145, 148, 142, 150, 146, 144, 147, 149],
+            'Low Dose': [138, 140, 135, 142, 139, 136, 141, 137],
+            'Mid Dose': [130, 128, 132, 125, 129, 131, 127, 126],
+            'High Dose': [115, 118, 112, 120, 116, 114, 117, 119],
+            'Positive': [125, 128, 122, 126, 124, 127, 123, 121]
         }
         self.data_grid.set_data(samples)
         
@@ -418,6 +565,33 @@ class PharmaStatApp:
             for c in range(10):
                 self.heatmap_grid.cells[(r, c)].insert(0, f'{heatmap_data[r,c]:.1f}')
         
+        volcano_genes = [
+            ('GAPDH', 0.12, 0.85),
+            ('ACTB', 0.05, 0.72),
+            ('TNF', 2.5, 0.001),
+            ('IL6', 3.1, 0.0003),
+            ('IL1B', 2.8, 0.0008),
+            ('CXCL8', 1.9, 0.015),
+            ('CCL2', -2.3, 0.002),
+            ('CXCL10', -3.5, 0.0001),
+            ('IFNG', -1.8, 0.008),
+            ('IL10', -2.1, 0.004),
+            ('VEGFA', 1.5, 0.025),
+            ('EGFR', 0.8, 0.15),
+            ('TP53', -0.3, 0.65),
+            ('BAX', 0.2, 0.78),
+            ('BCL2', -0.15, 0.88),
+            ('CASP3', 0.4, 0.45),
+            ('MMP9', 2.2, 0.003),
+            ('MMP2', 1.6, 0.02),
+            ('COX2', 2.9, 0.0005),
+            ('NOS2', -1.5, 0.03),
+        ]
+        for i, (gene, fc, pval) in enumerate(volcano_genes):
+            self.volcano_grid.cells[(i, 0)].insert(0, gene)
+            self.volcano_grid.cells[(i, 1)].insert(0, str(fc))
+            self.volcano_grid.cells[(i, 2)].insert(0, str(pval))
+        
     def setup_ui(self):
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
@@ -426,16 +600,19 @@ class PharmaStatApp:
         self.tab_dose = ttk.Frame(self.notebook)
         self.tab_corr = ttk.Frame(self.notebook)
         self.tab_heatmap = ttk.Frame(self.notebook)
+        self.tab_volcano = ttk.Frame(self.notebook)
         
-        self.notebook.add(self.tab_group, text='组间比较')
-        self.notebook.add(self.tab_dose, text='量效曲线')
-        self.notebook.add(self.tab_corr, text='相关性')
-        self.notebook.add(self.tab_heatmap, text='热图')
+        self.notebook.add(self.tab_group, text='Group')
+        self.notebook.add(self.tab_dose, text='Dose-Response')
+        self.notebook.add(self.tab_corr, text='Correlation')
+        self.notebook.add(self.tab_heatmap, text='Heatmap')
+        self.notebook.add(self.tab_volcano, text='Volcano')
         
         self.setup_group_tab()
         self.setup_dose_tab()
         self.setup_corr_tab()
         self.setup_heatmap_tab()
+        self.setup_volcano_tab()
         
     def setup_group_tab(self):
         input_frame = ttk.Frame(self.tab_group)
@@ -444,12 +621,14 @@ class PharmaStatApp:
         top_bar = ttk.Frame(input_frame)
         top_bar.pack(fill=tk.X, pady=(0,5))
         
-        ttk.Label(top_bar, text='指标:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
+        ttk.Label(top_bar, text='Indicator:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
         indicator_combo = ttk.Combobox(top_bar, textvariable=self.current_indicator, 
                                         values=DEFAULT_INDICATORS, width=18)
         indicator_combo.pack(side=tk.LEFT, padx=5)
         
-        ttk.Button(top_bar, text='清空', command=self.clear_group_data).pack(side=tk.LEFT, padx=10)
+        btn = ttk.Button(top_bar, text='Clear', command=self.clear_group_data)
+        btn.pack(side=tk.LEFT, padx=10)
+        add_tooltip(btn, 'Clear')
         
         canvas_frame = ttk.Frame(input_frame, relief=tk.SUNKEN, borderwidth=1)
         canvas_frame.pack(fill=tk.BOTH, expand=True)
@@ -474,13 +653,31 @@ class PharmaStatApp:
         btn_bar = ttk.Frame(input_frame)
         btn_bar.pack(fill=tk.X, pady=(5,0))
         
-        ttk.Button(btn_bar, text='+添加样本列', command=self.data_grid.add_col).pack(side=tk.LEFT, padx=3)
-        ttk.Button(btn_bar, text='-删除样本列', command=self.data_grid.del_col).pack(side=tk.LEFT, padx=3)
+        btn = ttk.Button(btn_bar, text='+ Add Col', command=self.data_grid.add_col)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '+ Add Col')
+        
+        btn = ttk.Button(btn_bar, text='- Del Col', command=self.data_grid.del_col)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '- Del Col')
+        
         ttk.Separator(btn_bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Button(btn_bar, text='柱状图+误差线', command=self.generate_bar_chart).pack(side=tk.LEFT, padx=3)
-        ttk.Button(btn_bar, text='箱线图', command=self.generate_box_chart).pack(side=tk.LEFT, padx=3)
-        ttk.Button(btn_bar, text='导入CSV', command=self.load_csv).pack(side=tk.LEFT, padx=10)
-        ttk.Button(btn_bar, text='导出统计', command=self.export_stats).pack(side=tk.LEFT, padx=3)
+        
+        btn = ttk.Button(btn_bar, text='Bar+Error', command=self.generate_bar_chart)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, 'Bar+Error')
+        
+        btn = ttk.Button(btn_bar, text='Boxplot', command=self.generate_box_chart)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, 'Boxplot')
+        
+        btn = ttk.Button(btn_bar, text='Import CSV', command=self.load_csv)
+        btn.pack(side=tk.LEFT, padx=10)
+        add_tooltip(btn, 'Import CSV')
+        
+        btn = ttk.Button(btn_bar, text='Export', command=self.export_stats)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, 'Export')
         
     def setup_dose_tab(self):
         left_frame = ttk.Frame(self.tab_dose)
@@ -489,9 +686,12 @@ class PharmaStatApp:
         top_bar = ttk.Frame(left_frame)
         top_bar.pack(fill=tk.X, pady=(0,5))
         
-        ttk.Label(top_bar, text='指标:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
+        ttk.Label(top_bar, text='Indicator:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
         ttk.Entry(top_bar, textvariable=self.dose_indicator, width=15).pack(side=tk.LEFT, padx=5)
-        ttk.Button(top_bar, text='清空', command=self.clear_dose_data).pack(side=tk.LEFT, padx=10)
+        
+        btn = ttk.Button(top_bar, text='Clear', command=self.clear_dose_data)
+        btn.pack(side=tk.LEFT, padx=10)
+        add_tooltip(btn, 'Clear')
         
         canvas_frame = ttk.Frame(left_frame, relief=tk.SUNKEN, borderwidth=1)
         canvas_frame.pack(fill=tk.BOTH, expand=True)
@@ -514,10 +714,17 @@ class PharmaStatApp:
         btn_bar = ttk.Frame(left_frame)
         btn_bar.pack(fill=tk.X, pady=(5,0))
         
-        ttk.Button(btn_bar, text='+加一行', command=self.dose_grid.add_row).pack(side=tk.LEFT, padx=3)
-        ttk.Button(btn_bar, text='-减一行', command=self.dose_grid.del_row).pack(side=tk.LEFT, padx=3)
+        btn = ttk.Button(btn_bar, text='+ Add Row', command=self.dose_grid.add_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '+ Add Row')
+        
+        btn = ttk.Button(btn_bar, text='- Del Row', command=self.dose_grid.del_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '- Del Row')
         ttk.Separator(btn_bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Button(btn_bar, text='生成量效曲线', command=self.generate_dose_curve).pack(side=tk.LEFT, padx=3)
+        btn = ttk.Button(btn_bar, text='Generate Curve', command=self.generate_dose_curve)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, 'Generate Curve')
         
     def setup_corr_tab(self):
         left_frame = ttk.Frame(self.tab_corr)
@@ -530,7 +737,9 @@ class PharmaStatApp:
         ttk.Entry(top_bar, textvariable=self.corr_xlabel, width=10).pack(side=tk.LEFT, padx=5)
         ttk.Label(top_bar, text='Y:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
         ttk.Entry(top_bar, textvariable=self.corr_ylabel, width=10).pack(side=tk.LEFT, padx=5)
-        ttk.Button(top_bar, text='清空', command=self.clear_corr_data).pack(side=tk.LEFT, padx=10)
+        btn = ttk.Button(top_bar, text='Clear', command=self.clear_corr_data)
+        btn.pack(side=tk.LEFT, padx=10)
+        add_tooltip(btn, 'Clear')
         
         canvas_frame = ttk.Frame(left_frame, relief=tk.SUNKEN, borderwidth=1)
         canvas_frame.pack(fill=tk.BOTH, expand=True)
@@ -553,10 +762,17 @@ class PharmaStatApp:
         btn_bar = ttk.Frame(left_frame)
         btn_bar.pack(fill=tk.X, pady=(5,0))
         
-        ttk.Button(btn_bar, text='+加一行', command=self.corr_grid.add_row).pack(side=tk.LEFT, padx=3)
-        ttk.Button(btn_bar, text='-减一行', command=self.corr_grid.del_row).pack(side=tk.LEFT, padx=3)
+        btn = ttk.Button(btn_bar, text='+ Add Row', command=self.corr_grid.add_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '+ Add Row')
+        
+        btn = ttk.Button(btn_bar, text='- Del Row', command=self.corr_grid.del_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '- Del Row')
         ttk.Separator(btn_bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Button(btn_bar, text='散点图+回归', command=self.generate_corr_plot).pack(side=tk.LEFT, padx=3)
+        btn = ttk.Button(btn_bar, text='Scatter Plot', command=self.generate_corr_plot)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, 'Scatter Plot')
         
     def setup_heatmap_tab(self):
         left_frame = ttk.Frame(self.tab_heatmap)
@@ -565,11 +781,13 @@ class PharmaStatApp:
         top_bar = ttk.Frame(left_frame)
         top_bar.pack(fill=tk.X, pady=(0,5))
         
-        ttk.Label(top_bar, text='行标签:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
+        ttk.Label(top_bar, text='Row Labels:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
         ttk.Entry(top_bar, textvariable=self.row_labels_var, width=20).pack(side=tk.LEFT, padx=5)
-        ttk.Label(top_bar, text='列标签:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
+        ttk.Label(top_bar, text='Col Labels:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
         ttk.Entry(top_bar, textvariable=self.col_labels_var, width=20).pack(side=tk.LEFT, padx=5)
-        ttk.Button(top_bar, text='清空', command=self.clear_heatmap_data).pack(side=tk.LEFT, padx=10)
+        btn = ttk.Button(top_bar, text='Clear', command=self.clear_heatmap_data)
+        btn.pack(side=tk.LEFT, padx=10)
+        add_tooltip(btn, 'Clear')
         
         canvas_frame = ttk.Frame(left_frame, relief=tk.SUNKEN, borderwidth=1)
         canvas_frame.pack(fill=tk.BOTH, expand=True)
@@ -594,12 +812,82 @@ class PharmaStatApp:
         btn_bar = ttk.Frame(left_frame)
         btn_bar.pack(fill=tk.X, pady=(5,0))
         
-        ttk.Button(btn_bar, text='+加行', command=self.heatmap_grid.add_row).pack(side=tk.LEFT, padx=3)
-        ttk.Button(btn_bar, text='-减行', command=self.heatmap_grid.del_row).pack(side=tk.LEFT, padx=3)
-        ttk.Button(btn_bar, text='+加列', command=self.heatmap_grid.add_col).pack(side=tk.LEFT, padx=3)
-        ttk.Button(btn_bar, text='-减列', command=self.heatmap_grid.del_col).pack(side=tk.LEFT, padx=3)
+        btn = ttk.Button(btn_bar, text='+ Add Row', command=self.heatmap_grid.add_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '+ Add Row')
+        
+        btn = ttk.Button(btn_bar, text='- Del Row', command=self.heatmap_grid.del_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '- Del Row')
+        
+        btn = ttk.Button(btn_bar, text='+ Add Col', command=self.heatmap_grid.add_col)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '+ Add Col')
+        
+        btn = ttk.Button(btn_bar, text='- Del Col', command=self.heatmap_grid.del_col)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '- Del Col')
         ttk.Separator(btn_bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
-        ttk.Button(btn_bar, text='生成热图', command=self.generate_heatmap).pack(side=tk.LEFT, padx=3)
+        btn = ttk.Button(btn_bar, text='Generate', command=self.generate_heatmap)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, 'Generate')
+        
+    def setup_volcano_tab(self):
+        left_frame = ttk.Frame(self.tab_volcano)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        top_bar = ttk.Frame(left_frame)
+        top_bar.pack(fill=tk.X, pady=(0,5))
+        
+        ttk.Label(top_bar, text='FC Threshold:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(top_bar, textvariable=self.volcano_fc_var, width=10).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(top_bar, text='P-value:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(top_bar, textvariable=self.volcano_pval_var, width=10).pack(side=tk.LEFT, padx=5)
+        
+        btn = ttk.Button(top_bar, text='Clear', command=self.clear_volcano_data)
+        btn.pack(side=tk.LEFT, padx=10)
+        add_tooltip(btn, 'Clear')
+        
+        canvas_frame = ttk.Frame(left_frame, relief=tk.SUNKEN, borderwidth=1)
+        canvas_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.canvas_volcano = tk.Canvas(canvas_frame)
+        self.vsb_volcano = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self.canvas_volcano.yview)
+        self.canvas_volcano.configure(yscrollcommand=self.vsb_volcano.set)
+        
+        self.vsb_volcano.pack(side=tk.RIGHT, fill=tk.Y)
+        self.canvas_volcano.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        self.volcano_grid_frame = ttk.Frame(self.canvas_volcano)
+        self.canvas_volcano.create_window((0, 0), window=self.volcano_grid_frame, anchor=tk.NW)
+        
+        self.volcano_grid = VolcanoGrid(self.volcano_grid_frame, rows=20)
+        self.volcano_grid.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.volcano_grid_frame.bind("<Configure>", lambda e: self.canvas_volcano.configure(scrollregion=self.canvas_volcano.bbox("all")))
+        
+        btn_bar = ttk.Frame(left_frame)
+        btn_bar.pack(fill=tk.X, pady=(5,0))
+        
+        btn = ttk.Button(btn_bar, text='+ Add Row', command=self.volcano_grid.add_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '+ Add Row')
+        
+        btn = ttk.Button(btn_bar, text='- Del Row', command=self.volcano_grid.del_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '- Del Row')
+        
+        ttk.Separator(btn_bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        
+        btn = ttk.Button(btn_bar, text='Generate Volcano', command=self.generate_volcano_plot)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, 'Generate Volcano')
+        
+    def clear_volcano_data(self):
+        for r in range(self.volcano_grid.rows):
+            for c in range(3):
+                self.volcano_grid.cells[(r, c)].delete(0, tk.END)
         
     def clear_group_data(self):
         for r in range(6):
@@ -638,11 +926,11 @@ class PharmaStatApp:
         return stats_dict
         
     def statistical_test(self, data, group):
-        if group == '对照组' or '对照组' not in data:
+        if group == 'Control' or 'Control' not in data:
             return None
         if len(data[group]) < 2:
             return None
-        t_stat, p_value = stats.ttest_ind(data[group], data['对照组'])
+        t_stat, p_value = stats.ttest_ind(data[group], data['Control'])
         return p_value
         
     def get_significance_marker(self, p_value):
@@ -679,7 +967,7 @@ class PharmaStatApp:
         for i, group in enumerate(groups):
             p_value = self.statistical_test(data, group)
             marker = self.get_significance_marker(p_value)
-            if marker and group != '对照组':
+            if marker and group != 'Control':
                 max_val = stats_dict[group]['mean'] + stats_dict[group]['sem']
                 ax.annotate(marker, (x_pos[i], max_val + sems[i]*0.3),
                                ha='center', va='bottom', fontsize=14, fontweight='bold')
@@ -717,7 +1005,7 @@ class PharmaStatApp:
         for i, group in enumerate(groups):
             p_value = self.statistical_test(data, group)
             marker = self.get_significance_marker(p_value)
-            if marker and group != '对照组':
+            if marker and group != 'Control':
                 y_max = max(data[group])
                 ax.annotate(marker, (i, y_max + (y_max*0.05)),
                                ha='center', va='bottom', fontsize=14, fontweight='bold')
@@ -832,32 +1120,63 @@ class PharmaStatApp:
         win = ChartWindow('热图')
         ax = win.ax
         
-        row_labels = self.row_labels_var.get().split(',') if self.row_labels_var.get() else None
-        col_labels = self.col_labels_var.get().split(',') if self.col_labels_var.get() else None
+        row_labels = self.row_labels_var.get().split(',') if self.row_labels_var.get() else [f'R{i+1}' for i in range(data.shape[0])]
+        col_labels = self.col_labels_var.get().split(',') if self.col_labels_var.get() else [f'C{i+1}' for i in range(data.shape[1])]
         
         if row_labels and len(row_labels) != data.shape[0]:
-            row_labels = None
+            row_labels = [f'R{i+1}' for i in range(data.shape[0])]
         if col_labels and len(col_labels) != data.shape[1]:
-            col_labels = None
+            col_labels = [f'C{i+1}' for i in range(data.shape[1])]
         
-        im = ax.imshow(data, cmap='RdBu_r', aspect='auto')
+        df_heatmap = pd.DataFrame(data, index=row_labels, columns=col_labels)
         
-        for i in range(data.shape[0]):
-            for j in range(data.shape[1]):
-                val = data[i, j]
-                color = 'white' if abs(val) > np.max(np.abs(data))/2 else 'black'
-                ax.text(j, i, f'{val:.1f}', ha='center', va='center', color=color, fontsize=8)
+        sns.heatmap(df_heatmap, annot=True, fmt='.1f', cmap='coolwarm', 
+                    center=0, linewidths=1, linecolor='white',
+                    ax=ax, cbar_kws={'shrink': 0.8})
         
-        if row_labels:
-            ax.set_yticks(range(len(row_labels)))
-            ax.set_yticklabels(row_labels, fontsize=9)
-        if col_labels:
-            ax.set_xticks(range(len(col_labels)))
-            ax.set_xticklabels(col_labels, fontsize=9, rotation=45)
-            
         ax.set_title('Heatmap', fontsize=14, fontweight='bold')
         
-        win.fig.colorbar(im, ax=ax, shrink=0.8)
+        win.show()
+        
+    def generate_volcano_plot(self):
+        genes, log2fcs, pvals = self.volcano_grid.get_data()
+        if len(genes) < 3:
+            messagebox.showwarning('Warning', 'Please input at least 3 genes')
+            return
+            
+        log2fcs = np.array(log2fcs)
+        pvals = np.array(pvals)
+        neg_log10_pvals = -np.log10(pvals + 1e-10)
+        
+        fc_threshold = self.volcano_fc_var.get()
+        pval_threshold = self.volcano_pval_var.get()
+        
+        colors = ['gray'] * len(genes)
+        for i in range(len(genes)):
+            if log2fcs[i] > np.log2(float(fc_threshold)) and pvals[i] < float(pval_threshold):
+                colors[i] = '#E53935'
+            elif log2fcs[i] < -np.log2(float(fc_threshold)) and pvals[i] < float(pval_threshold):
+                colors[i] = '#1976D2'
+        
+        win = ChartWindow('Volcano Plot')
+        ax = win.ax
+        
+        ax.scatter(log2fcs, neg_log10_pvals, c=colors, alpha=0.7, s=50, edgecolors='white')
+        
+        ax.axhline(y=-np.log10(float(pval_threshold)), color='blue', linestyle='--', alpha=0.5, linewidth=1)
+        ax.axvline(x=np.log2(float(fc_threshold)), color='red', linestyle='--', alpha=0.5, linewidth=1)
+        ax.axvline(x=-np.log2(float(fc_threshold)), color='red', linestyle='--', alpha=0.5, linewidth=1)
+        
+        for i, gene in enumerate(genes):
+            if abs(log2fcs[i]) > np.log2(float(fc_threshold)) and pvals[i] < float(pval_threshold):
+                ax.annotate(gene, (log2fcs[i], neg_log10_pvals[i]), fontsize=8, alpha=0.8)
+        
+        ax.set_xlabel('Log2(Fold Change)', fontsize=12)
+        ax.set_ylabel('-Log10(P-value)', fontsize=12)
+        ax.set_title('Volcano Plot', fontsize=14, fontweight='bold')
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        
         win.show()
         
     def load_csv(self):
