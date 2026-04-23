@@ -136,6 +136,7 @@ TOOLTIP_MAP = {
     '+ Add Col': '添加列',
     '- Del Col': '删除列',
     'Generate': '生成热图',
+    'Generate Volcano': '生成火山图',
     'Save PNG': '保存为PNG图片',
     'Save PDF': '保存为PDF文档',
 }
