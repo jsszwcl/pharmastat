@@ -74,7 +74,17 @@ class VolcanoGrid(ttk.Frame):
             self.cells[(r, c)].destroy()
             del self.cells[(r, c)]
         self.rows -= 1
-        
+    
+    def set_data(self, genes, log2fcs, pvals):
+        for r in range(self.rows):
+            for c in range(3):
+                self.cells[(r, c)].delete(0, tk.END)
+        for i, (gene, log2fc, pval) in enumerate(zip(genes, log2fcs, pvals)):
+            if i < self.rows:
+                self.cells[(i, 0)].insert(0, str(gene))
+                self.cells[(i, 1)].insert(0, str(log2fc))
+                self.cells[(i, 2)].insert(0, str(pval))
+    
     def get_data(self):
         genes = []
         log2fcs = []
@@ -535,6 +545,7 @@ class PharmaStatApp:
         self.col_labels_var = tk.StringVar(value='')
         self.volcano_fc_var = tk.StringVar(value='2')
         self.volcano_pval_var = tk.StringVar(value='0.05')
+        self.tab_files = [None] * 5
         
         self.setup_ui()
         
@@ -592,6 +603,19 @@ class PharmaStatApp:
             self.volcano_grid.cells[(i, 2)].insert(0, f'{pval:.4f}')
         
     def setup_ui(self):
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+        
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label='File', menu=file_menu)
+        file_menu.add_command(label='Save', command=self.save_project, accelerator='Ctrl+S')
+        file_menu.add_command(label='Save As...', command=self.save_project_as)
+        file_menu.add_command(label='Import', command=self.load_csv)
+        file_menu.add_separator()
+        file_menu.add_command(label='Exit', command=self.root.quit)
+        
+        self.root.bind('<Control-s>', self._on_ctrl_s)
+        
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
@@ -669,14 +693,6 @@ class PharmaStatApp:
         btn = ttk.Button(btn_bar, text='Boxplot', command=self.generate_box_chart)
         btn.pack(side=tk.LEFT, padx=3)
         add_tooltip(btn, 'Boxplot')
-        
-        btn = ttk.Button(btn_bar, text='Import CSV', command=self.load_csv)
-        btn.pack(side=tk.LEFT, padx=10)
-        add_tooltip(btn, 'Import CSV')
-        
-        btn = ttk.Button(btn_bar, text='Export', command=self.export_stats)
-        btn.pack(side=tk.LEFT, padx=3)
-        add_tooltip(btn, 'Export')
         
     def setup_dose_tab(self):
         left_frame = ttk.Frame(self.tab_dose)
@@ -1180,23 +1196,233 @@ class PharmaStatApp:
         win.show()
         
     def load_csv(self):
+        current_tab = self.notebook.index(self.notebook.select())
+        
+        if current_tab == 0:
+            self.load_group_csv()
+        elif current_tab == 1:
+            self.load_dose_csv()
+        elif current_tab == 2:
+            self.load_corr_csv()
+        elif current_tab == 3:
+            self.load_heatmap_csv()
+        elif current_tab == 4:
+            self.load_volcano_csv()
+    
+    def load_group_csv(self):
         filename = filedialog.askopenfilename(filetypes=[('CSV文件', '*.csv'), ('所有文件', '*.*')])
         if filename:
             try:
                 df = pd.read_csv(filename)
                 data = {}
-                for group in GROUP_ORDER:
-                    if group in df.columns:
-                        data[group] = df[group].dropna().tolist()
+                
+                if 'Group' in df.columns:
+                    sample_cols = [c for c in df.columns if c.startswith('Sample')]
+                    if not sample_cols:
+                        messagebox.showwarning('警告', '该文件不是Group格式,无Sample列')
+                        return
+                    for group in GROUP_ORDER:
+                        group_data = df[df['Group'] == group]
+                        vals = []
+                        for c in sample_cols:
+                            v = pd.to_numeric(group_data[c], errors='coerce').dropna()
+                            vals.extend(v.tolist())
+                        data[group] = vals
+                elif any(group in df.columns for group in GROUP_ORDER):
+                    for group in GROUP_ORDER:
+                        if group in df.columns:
+                            data[group] = df[group].dropna().tolist()
+                        else:
+                            data[group] = []
+                else:
+                    if 'Dose' in df.columns and 'Effect' in df.columns:
+                        messagebox.showwarning('警告', '该文件是Dose-Response格式,请切换到Dose-Response标签页导入')
+                        return
+                    elif 'X' in df.columns and 'Y' in df.columns:
+                        messagebox.showwarning('警告', '该文件是Correlation格式,请切换到Correlation标签页导入')
+                        return
+                    elif df.shape[0] > 1 and df.shape[1] > 1:
+                        messagebox.showwarning('警告', '该文件是Heatmap格式,请切换到Heatmap标签页导入')
+                        return
+                    elif 'Gene' in df.columns:
+                        messagebox.showwarning('警告', '该文件是Volcano格式,请切换到Volcano标签页导入')
+                        return
                     else:
-                        data[group] = []
+                        messagebox.showwarning('警告', '该文件不是Group格式')
+                        return
+                
+                max_cols = max(len(v) for v in data.values()) if data else 0
+                if max_cols == 0:
+                    messagebox.showwarning('警告', '该文件没有有效数据')
+                    return
+                while self.data_grid.cols < max_cols:
+                    self.data_grid.add_col()
                 self.data_grid.set_data(data)
-                if len(df.columns) > 0:
-                    self.current_indicator.set(df.columns[0])
+                self.tab_files[0] = filename
+                messagebox.showinfo('成功', f'已导入 {filename}')
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                messagebox.showerror('错误', str(e))
+    
+    def load_dose_csv(self):
+        filename = filedialog.askopenfilename(filetypes=[('CSV文件', '*.csv'), ('所有文件', '*.*')])
+        if filename:
+            try:
+                df = pd.read_csv(filename)
+                if 'Dose' in df.columns and 'Effect' in df.columns:
+                    doses = pd.to_numeric(df['Dose'], errors='coerce').dropna().tolist()
+                    effects = pd.to_numeric(df['Effect'], errors='coerce').dropna().tolist()
+                    sds = pd.to_numeric(df['SD'], errors='coerce').dropna().tolist() if 'SD' in df.columns else []
+                    ns = pd.to_numeric(df['N'], errors='coerce').dropna().tolist() if 'N' in df.columns else []
+                    self.dose_grid.set_data(doses, effects, sds, ns)
+                    self.tab_files[1] = filename
+                    messagebox.showinfo('成功', f'已导入 {filename}')
+                elif 'Group' in df.columns:
+                    messagebox.showwarning('警告', '该文件是Group格式,请切换到Group标签页导入')
+                elif 'X' in df.columns and 'Y' in df.columns:
+                    messagebox.showwarning('警告', '该文件是Correlation格式,请切换到Correlation标签页导入')
+                elif df.shape[0] > 1 and df.shape[1] > 1:
+                    messagebox.showwarning('警告', '该文件是Heatmap格式,请切换到Heatmap标签页导入')
+                elif 'Gene' in df.columns:
+                    messagebox.showwarning('警告', '该文件是Volcano格式,请切换到Volcano标签页导入')
+                else:
+                    messagebox.showwarning('警告', 'CSV需要包含Dose和Effect列')
+            except Exception as e:
+                messagebox.showerror('错误', str(e))
+    
+    def load_corr_csv(self):
+        filename = filedialog.askopenfilename(filetypes=[('CSV文件', '*.csv'), ('所有文件', '*.*')])
+        if filename:
+            try:
+                df = pd.read_csv(filename)
+                if 'X' in df.columns and 'Y' in df.columns:
+                    x = pd.to_numeric(df['X'], errors='coerce').dropna().tolist()
+                    y = pd.to_numeric(df['Y'], errors='coerce').dropna().tolist()
+                    groups = df['Group'].tolist() if 'Group' in df.columns else [''] * len(x)
+                    self.corr_grid.set_data(x, y, groups[:len(x)])
+                    self.tab_files[2] = filename
+                    messagebox.showinfo('成功', f'已导入 {filename}')
+                elif 'Group' in df.columns:
+                    messagebox.showwarning('警告', '该文件是Group格式,请切换到Group标签页导入')
+                elif 'Dose' in df.columns and 'Effect' in df.columns:
+                    messagebox.showwarning('警告', '该文件是Dose-Response格式,请切换到Dose-Response标签页导入')
+                elif df.shape[0] > 1 and df.shape[1] > 1:
+                    messagebox.showwarning('警告', '该文件是Heatmap格式,请切换到Heatmap标签页导入')
+                elif 'Gene' in df.columns:
+                    messagebox.showwarning('警告', '该文件是Volcano格式,请切换到Volcano标签页导入')
+                else:
+                    messagebox.showwarning('警告', 'CSV需要包含X和Y列')
+            except Exception as e:
+                messagebox.showerror('错误', str(e))
+    
+    def load_heatmap_csv(self):
+        filename = filedialog.askopenfilename(filetypes=[('CSV文件', '*.csv'), ('所有文件', '*.*')])
+        if filename:
+            try:
+                df = pd.read_csv(filename, header=None)
+                data = df.values.astype('float32')
+                self.heatmap_grid.set_data(data)
+                self.tab_files[3] = filename
                 messagebox.showinfo('成功', f'已导入 {filename}')
             except Exception as e:
                 messagebox.showerror('错误', str(e))
-                
+    
+    def load_volcano_csv(self):
+        filename = filedialog.askopenfilename(filetypes=[('CSV文件', '*.csv'), ('所有文件', '*.*')])
+        if filename:
+            try:
+                df = pd.read_csv(filename)
+                if 'Gene' in df.columns:
+                    genes = df['Gene'].tolist()
+                    log2fcs = pd.to_numeric(df['log2FC'], errors='coerce').tolist() if 'log2FC' in df.columns else [0] * len(genes)
+                    pvals = pd.to_numeric(df['P-value'], errors='coerce').tolist() if 'P-value' in df.columns else [1] * len(genes)
+                    self.volcano_grid.set_data(genes, log2fcs, pvals)
+                    self.tab_files[4] = filename
+                    messagebox.showinfo('成功', f'已导入 {filename}')
+                else:
+                    messagebox.showwarning('警告', 'CSV需要包含Gene列')
+            except Exception as e:
+                messagebox.showerror('错误', str(e))
+    
+    def save_project(self):
+        current_tab = self.notebook.index(self.notebook.select())
+        if self.tab_files[current_tab]:
+            self.save_to_tab(current_tab, self.tab_files[current_tab])
+            messagebox.showinfo('成功', f'已保存到 {self.tab_files[current_tab]}')
+        else:
+            self.save_project_as()
+    
+    def save_project_as(self):
+        current_tab = self.notebook.index(self.notebook.select())
+        tab_names = ['Group', 'Dose-Response', 'Correlation', 'Heatmap', 'Volcano']
+        default_name = f'{tab_names[current_tab]}_project.csv'
+        
+        filename = filedialog.asksaveasfilename(
+            defaultextension='.csv',
+            filetypes=[('CSV文件', '*.csv'), ('所有文件', '*.*')],
+            initialfile=default_name
+        )
+        if filename:
+            self.tab_files[current_tab] = filename
+            self.save_to_tab(current_tab, filename)
+            messagebox.showinfo('成功', f'已保存到 {filename}')
+    
+    def save_to_tab(self, current_tab, filename):
+        if current_tab == 0:
+            self.save_group(filename)
+        elif current_tab == 1:
+            self.save_dose(filename)
+        elif current_tab == 2:
+            self.save_corr(filename)
+        elif current_tab == 3:
+            self.save_heatmap(filename)
+        elif current_tab == 4:
+            self.save_volcano(filename)
+    
+    def save_group(self, filename):
+        data = self.collect_data()
+        rows = []
+        for group in GROUP_ORDER:
+            if group in data and data[group]:
+                rows.append([group] + data[group])
+        if rows:
+            max_cols = max(len(row) for row in rows)
+            cols = ['Group'] + [f'Sample{i+1}' for i in range(max_cols-1)]
+            df = pd.DataFrame(rows, columns=cols[:max_cols])
+            df.to_csv(filename, index=False, encoding='utf-8-sig')
+    
+    def save_dose(self, filename):
+        doses, effects, sds, ns = self.dose_grid.get_data()
+        data = list(zip(doses, effects, sds, ns))
+        if data:
+            df = pd.DataFrame(data, columns=['Dose', 'Effect', 'SD', 'N'])
+            df.to_csv(filename, index=False, encoding='utf-8-sig')
+    
+    def save_corr(self, filename):
+        x, y, groups = self.corr_grid.get_data()
+        data = list(zip(x, y, groups))
+        if data:
+            df = pd.DataFrame(data, columns=['X', 'Y', 'Group'])
+            df.to_csv(filename, index=False, encoding='utf-8-sig')
+    
+    def save_heatmap(self, filename):
+        data = self.heatmap_grid.get_data()
+        if data is not None and data.size > 0:
+            df = pd.DataFrame(data)
+            df.to_csv(filename, index=False, header=False, encoding='utf-8-sig')
+    
+    def save_volcano(self, filename):
+        genes, log2fcs, pvals = self.volcano_grid.get_data()
+        data = list(zip(genes, log2fcs, pvals))
+        if data:
+            df = pd.DataFrame(data, columns=['Gene', 'log2FC', 'P-value'])
+            df.to_csv(filename, index=False, encoding='utf-8-sig')
+    
+    def _on_ctrl_s(self, event=None):
+        self.save_project()
+        return 'break'
+    
     def export_stats(self):
         data = self.collect_data()
         if not data:
