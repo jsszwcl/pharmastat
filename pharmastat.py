@@ -3,6 +3,11 @@
 """
 PharmaStat - 药学可视化的统计软件
 支持柱状图+误差线、箱线图、量效曲线、相关性热图等
+
+Author: Chengli Wang
+Location: Suzhou, Jiangsu, China
+This code is open source and written in Python.
+Contributions and improvements are welcome - please feel free to fork and submit pull requests.
 """
 
 import tkinter as tk
