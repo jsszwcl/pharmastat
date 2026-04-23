@@ -549,6 +549,11 @@ class PharmaStatApp:
         
         self.setup_ui()
         
+        self.root.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.root.bind_all("<Button-4>", self._on_mousewheel)
+        self.root.bind_all("<Button-5>", self._on_mousewheel)
+        
+        self.root.after(100, self._bind_child_scroll_events)
         self.root.after(500, self.load_sample_data)
         
     def load_sample_data(self):
@@ -925,6 +930,54 @@ class PharmaStatApp:
             for c in range(self.heatmap_grid.cols):
                 self.heatmap_grid.cells[(r, c)].delete(0, tk.END)
                 
+    def _bind_child_scroll_events(self):
+        canvas_map = {
+            'canvas_group': 'data_grid_frame',
+            'canvas_dose': 'dose_grid_frame',
+            'canvas_corr': 'corr_grid_frame',
+            'canvas_heatmap': 'heatmap_grid_frame',
+            'canvas_volcano': 'volcano_grid_frame'
+        }
+        for canvas_name, frame_name in canvas_map.items():
+            canvas = getattr(self, canvas_name, None)
+            frame = getattr(self, frame_name, None)
+            if canvas:
+                canvas.bind("<MouseWheel>", self._on_mousewheel)
+                canvas.bind("<Button-4>", self._on_mousewheel)
+                canvas.bind("<Button-5>", self._on_mousewheel)
+            if frame:
+                frame.bind("<MouseWheel>", self._on_mousewheel)
+                frame.bind("<Button-4>", self._on_mousewheel)
+                frame.bind("<Button-5>", self._on_mousewheel)
+    
+    def _on_mousewheel(self, event):
+        try:
+            current_tab = self.notebook.index(self.notebook.select())
+            canvas_map = {0: 'canvas_group', 1: 'canvas_dose', 2: 'canvas_corr', 3: 'canvas_heatmap', 4: 'canvas_volcano'}
+            canvas = getattr(self, canvas_map.get(current_tab), None)
+            if not canvas:
+                return "break"
+            
+            sr = canvas.cget("scrollregion")
+            if sr and sr != 'None':
+                bbox = canvas.bbox("all")
+                if bbox:
+                    content_height = bbox[3]
+                    view_height = canvas.winfo_height()
+                    if content_height > view_height:
+                        if event.delta:
+                            if event.delta > 0:
+                                canvas.yview_scroll(-1, "units")
+                            else:
+                                canvas.yview_scroll(1, "units")
+                        elif event.num == 4:
+                            canvas.yview_scroll(-1, "units")
+                        elif event.num == 5:
+                            canvas.yview_scroll(1, "units")
+        except:
+            pass
+        return "break"
+        
     def collect_data(self):
         return self.data_grid.get_data()
         

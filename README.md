@@ -9,6 +9,7 @@ Pharmaceutical data visualization and analysis tool with English UI and Chinese 
 - **Correlation**: Scatter plot with regression line, r-value and p-value
 - **Heatmap**: Data matrix heatmap visualization
 - **Volcano Plot**: Differential expression analysis for genomics
+- **Global Scroll**: Mouse wheel scrolling works across all tabs and input fields
 
 ## Visualization
 
