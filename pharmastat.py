@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 PharmaStat - 药学可视化的统计软件
-支持柱状图+误差线、箱线图、量效曲线、相关性热图等
+支持柱状图+误差线、箱线图、量效曲线、相关性热图等   
 
 Author: Chengli Wang
 Location: Suzhou, Jiangsu, China
@@ -14,6 +14,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import matplotlib
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 matplotlib.use('TkAgg')
 
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei', 'Arial Unicode MS', 'DejaVu Sans']
@@ -477,6 +478,134 @@ class HeatmapGrid(ttk.Frame):
                     self.cells[(i, j)].insert(0, str(val))
 
 
+class PKPDGrid(ttk.Frame):
+    def __init__(self, parent, rows=30):
+        super().__init__(parent, relief=tk.SUNKEN, borderwidth=1)
+        self.rows = rows
+        self.cells = {}
+        self.setup_grid()
+        
+    def setup_grid(self):
+        headers = ['Time(h)', 'Conc(ng/mL)', 'Effect(%)']
+        for c, h in enumerate(headers):
+            ttk.Label(self, text=h, width=14, anchor='center', font=('Arial', 10, 'bold')).grid(row=0, column=c, padx=2, pady=3)
+            
+        for r in range(self.rows):
+            for c in range(3):
+                entry = ttk.Entry(self, width=14, justify='center')
+                entry.grid(row=r+1, column=c, padx=2, pady=2)
+                self.cells[(r, c)] = entry
+                
+    def add_row(self):
+        if self.rows >= 200:
+            return
+        self.rows += 1
+        r = self.rows - 1
+        for c in range(3):
+            entry = ttk.Entry(self, width=14, justify='center')
+            entry.grid(row=r+1, column=c, padx=2, pady=2)
+            self.cells[(r, c)] = entry
+            
+    def del_row(self):
+        if self.rows <= 1:
+            return
+        r = self.rows - 1
+        for c in range(3):
+            self.cells[(r, c)].grid_forget()
+            self.cells[(r, c)].destroy()
+            del self.cells[(r, c)]
+        self.rows -= 1
+        
+    def get_data(self):
+        times, concs, effects = [], [], []
+        for r in range(self.rows):
+            t = self.cells[(r, 0)].get().strip()
+            c = self.cells[(r, 1)].get().strip()
+            e = self.cells[(r, 2)].get().strip()
+            if t and c and e:
+                try:
+                    times.append(float(t))
+                    concs.append(float(c))
+                    effects.append(float(e))
+                except ValueError:
+                    pass
+        return times, concs, effects
+        
+    def set_data(self, times, concs, effects):
+        for r in range(self.rows):
+            for c in range(3):
+                self.cells[(r, c)].delete(0, tk.END)
+        for i, (t, c, e) in enumerate(zip(times, concs, effects)):
+            if i < self.rows:
+                self.cells[(i, 0)].insert(0, str(t))
+                self.cells[(i, 1)].insert(0, str(c))
+                self.cells[(i, 2)].insert(0, str(e))
+
+
+class PBPKGrid(ttk.Frame):
+    def __init__(self, parent, rows=50):
+        super().__init__(parent, relief=tk.SUNKEN, borderwidth=1)
+        self.rows = rows
+        self.cells = {}
+        self.setup_grid()
+        
+    def setup_grid(self):
+        headers = ['Tissue', 'Time(h)', 'Conc(ng/mL)']
+        for c, h in enumerate(headers):
+            ttk.Label(self, text=h, width=14, anchor='center', font=('Arial', 10, 'bold')).grid(row=0, column=c, padx=2, pady=3)
+            
+        for r in range(self.rows):
+            for c in range(3):
+                entry = ttk.Entry(self, width=14, justify='center')
+                entry.grid(row=r+1, column=c, padx=2, pady=2)
+                self.cells[(r, c)] = entry
+                
+    def add_row(self):
+        if self.rows >= 200:
+            return
+        self.rows += 1
+        r = self.rows - 1
+        for c in range(3):
+            entry = ttk.Entry(self, width=14, justify='center')
+            entry.grid(row=r+1, column=c, padx=2, pady=2)
+            self.cells[(r, c)] = entry
+            
+    def del_row(self):
+        if self.rows <= 1:
+            return
+        r = self.rows - 1
+        for c in range(3):
+            self.cells[(r, c)].grid_forget()
+            self.cells[(r, c)].destroy()
+            del self.cells[(r, c)]
+        self.rows -= 1
+        
+    def get_data(self):
+        tissues, times, concs = [], [], []
+        for r in range(self.rows):
+            tissue = self.cells[(r, 0)].get().strip()
+            t = self.cells[(r, 1)].get().strip()
+            c = self.cells[(r, 2)].get().strip()
+            if tissue and t and c:
+                try:
+                    tissues.append(tissue)
+                    times.append(float(t))
+                    concs.append(float(c))
+                except ValueError:
+                    pass
+        return tissues, times, concs
+        
+    def set_data(self, tissues, times, concs):
+        for r in range(self.rows):
+            for c in range(3):
+                self.cells[(r, c)].delete(0, tk.END)
+        for i, (ti, tm, co) in enumerate(zip(tissues, times, concs)):
+            if i < self.rows:
+                self.cells[(i, 0)].insert(0, str(ti))
+                self.cells[(i, 1)].insert(0, str(tm))
+                self.cells[(i, 2)].insert(0, str(co))
+
+
 def sigmoid(x, bottom, top, ec50, hill):
     return bottom + (top - bottom) / (1 + (ec50 / x) ** hill)
 
@@ -486,7 +615,7 @@ def inverse_sigmoid(y, bottom, top, ec50, hill):
 
 
 class ChartWindow:
-    def __init__(self, title, width=8, height=6):
+    def __init__(self, title, width=8, height=6, projection=None):
         self.top = tk.Toplevel()
         self.top.title(title)
         self.top.geometry("1000x800")
@@ -494,7 +623,10 @@ class ChartWindow:
         self.fig = Figure(figsize=(width, height), dpi=100)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.top)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        self.ax = self.fig.add_subplot(111)
+        if projection == '3d':
+            self.ax = self.fig.add_subplot(111, projection='3d')
+        else:
+            self.ax = self.fig.add_subplot(111)
         
         btn_frame = ttk.Frame(self.top)
         btn_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -551,7 +683,9 @@ class PharmaStatApp:
         self.col_labels_var = tk.StringVar(value='')
         self.volcano_fc_var = tk.StringVar(value='2')
         self.volcano_pval_var = tk.StringVar(value='0.05')
-        self.tab_files = [None] * 5
+        self.pkpd_drug_var = tk.StringVar(value='Drug A')
+        self.pbpk_drug_var = tk.StringVar(value='Compound X')
+        self.tab_files = [None] * 7
         
         self.setup_ui()
         
@@ -613,6 +747,39 @@ class PharmaStatApp:
             self.volcano_grid.cells[(i, 1)].insert(0, f'{log2fc:.2f}')
             self.volcano_grid.cells[(i, 2)].insert(0, f'{pval:.4f}')
         
+        # PK/PD Demo data: One-compartment oral model
+        pkpd_times = [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 6, 8, 12, 24]
+        ka, ke, dose = 1.5, 0.3, 100
+        ec50, emax = 10, 100
+        for i, t in enumerate(pkpd_times):
+            if t == 0:
+                conc = 0
+            else:
+                conc = dose * ka / (ka - ke) * (np.exp(-ke * t) - np.exp(-ka * t))
+            effect = emax * conc / (ec50 + conc)
+            self.pkpd_grid.cells[(i, 0)].insert(0, str(t))
+            self.pkpd_grid.cells[(i, 1)].insert(0, f'{conc:.2f}')
+            self.pkpd_grid.cells[(i, 2)].insert(0, f'{effect:.1f}')
+        
+        # PBPK Demo data: tissue distribution
+        pbpk_tissues = ['Heart', 'Liver', 'Kidney', 'Brain', 'Lung', 'Spleen', 'Muscle', 'Fat']
+        pbpk_times = [1, 2, 4, 8, 24]
+        base_conc = {'Heart': 25, 'Liver': 120, 'Kidney': 95, 'Brain': 8, 'Lung': 35, 'Spleen': 40, 'Muscle': 15, 'Fat': 5}
+        row = 0
+        for tissue in pbpk_tissues:
+            for t in pbpk_times:
+                base = base_conc[tissue]
+                if tissue in ['Liver', 'Kidney']:
+                    conc = base * np.exp(-0.15 * t) + 5
+                elif tissue == 'Fat':
+                    conc = base * (1 - np.exp(-0.08 * t))
+                else:
+                    conc = base * np.exp(-0.25 * t) + 2
+                self.pbpk_grid.cells[(row, 0)].insert(0, tissue)
+                self.pbpk_grid.cells[(row, 1)].insert(0, str(t))
+                self.pbpk_grid.cells[(row, 2)].insert(0, f'{conc:.1f}')
+                row += 1
+        
     def setup_ui(self):
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
@@ -635,18 +802,24 @@ class PharmaStatApp:
         self.tab_corr = ttk.Frame(self.notebook)
         self.tab_heatmap = ttk.Frame(self.notebook)
         self.tab_volcano = ttk.Frame(self.notebook)
+        self.tab_pkpd = ttk.Frame(self.notebook)
+        self.tab_pbpk = ttk.Frame(self.notebook)
         
         self.notebook.add(self.tab_group, text='Group')
         self.notebook.add(self.tab_dose, text='Dose-Response')
         self.notebook.add(self.tab_corr, text='Correlation')
         self.notebook.add(self.tab_heatmap, text='Heatmap')
         self.notebook.add(self.tab_volcano, text='Volcano')
+        self.notebook.add(self.tab_pkpd, text='PK/PD')
+        self.notebook.add(self.tab_pbpk, text='PBPK')
         
         self.setup_group_tab()
         self.setup_dose_tab()
         self.setup_corr_tab()
         self.setup_heatmap_tab()
         self.setup_volcano_tab()
+        self.setup_pkpd_tab()
+        self.setup_pbpk_tab()
         
     def setup_group_tab(self):
         input_frame = ttk.Frame(self.tab_group)
@@ -700,6 +873,10 @@ class PharmaStatApp:
         btn = ttk.Button(btn_bar, text='Bar+Error', command=self.generate_bar_chart)
         btn.pack(side=tk.LEFT, padx=3)
         add_tooltip(btn, 'Bar+Error')
+        
+        btn = ttk.Button(btn_bar, text='3D Bar', command=self.generate_3d_bar_chart)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '3D Bar')
         
         btn = ttk.Button(btn_bar, text='Boxplot', command=self.generate_box_chart)
         btn.pack(side=tk.LEFT, padx=3)
@@ -910,11 +1087,121 @@ class PharmaStatApp:
         btn.pack(side=tk.LEFT, padx=3)
         add_tooltip(btn, 'Generate Volcano')
         
+    def setup_pkpd_tab(self):
+        left_frame = ttk.Frame(self.tab_pkpd)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        top_bar = ttk.Frame(left_frame)
+        top_bar.pack(fill=tk.X, pady=(0,5))
+        
+        ttk.Label(top_bar, text='Drug:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(top_bar, textvariable=self.pkpd_drug_var, width=18).pack(side=tk.LEFT, padx=5)
+        
+        btn = ttk.Button(top_bar, text='Clear', command=self.clear_pkpd_data)
+        btn.pack(side=tk.LEFT, padx=10)
+        add_tooltip(btn, 'Clear')
+        
+        canvas_frame = ttk.Frame(left_frame, relief=tk.SUNKEN, borderwidth=1)
+        canvas_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.canvas_pkpd = tk.Canvas(canvas_frame)
+        self.vsb_pkpd = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self.canvas_pkpd.yview)
+        self.canvas_pkpd.configure(yscrollcommand=self.vsb_pkpd.set)
+        
+        self.vsb_pkpd.pack(side=tk.RIGHT, fill=tk.Y)
+        self.canvas_pkpd.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        self.pkpd_grid_frame = ttk.Frame(self.canvas_pkpd)
+        self.canvas_pkpd.create_window((0, 0), window=self.pkpd_grid_frame, anchor=tk.NW)
+        
+        self.pkpd_grid = PKPDGrid(self.pkpd_grid_frame, rows=30)
+        self.pkpd_grid.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.pkpd_grid_frame.bind("<Configure>", lambda e: self.canvas_pkpd.configure(scrollregion=self.canvas_pkpd.bbox("all")))
+        
+        btn_bar = ttk.Frame(left_frame)
+        btn_bar.pack(fill=tk.X, pady=(5,0))
+        
+        btn = ttk.Button(btn_bar, text='+ Add Row', command=self.pkpd_grid.add_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '+ Add Row')
+        
+        btn = ttk.Button(btn_bar, text='- Del Row', command=self.pkpd_grid.del_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '- Del Row')
+        
+        ttk.Separator(btn_bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        
+        btn = ttk.Button(btn_bar, text='Generate PK/PD Surface', command=self.generate_pkpd_surface)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, 'Generate PK/PD Surface')
+        
+    def setup_pbpk_tab(self):
+        left_frame = ttk.Frame(self.tab_pbpk)
+        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        top_bar = ttk.Frame(left_frame)
+        top_bar.pack(fill=tk.X, pady=(0,5))
+        
+        ttk.Label(top_bar, text='Drug:', font=('Arial', 11)).pack(side=tk.LEFT, padx=5)
+        ttk.Entry(top_bar, textvariable=self.pbpk_drug_var, width=18).pack(side=tk.LEFT, padx=5)
+        
+        btn = ttk.Button(top_bar, text='Clear', command=self.clear_pbpk_data)
+        btn.pack(side=tk.LEFT, padx=10)
+        add_tooltip(btn, 'Clear')
+        
+        canvas_frame = ttk.Frame(left_frame, relief=tk.SUNKEN, borderwidth=1)
+        canvas_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.canvas_pbpk = tk.Canvas(canvas_frame)
+        self.vsb_pbpk = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL, command=self.canvas_pbpk.yview)
+        self.canvas_pbpk.configure(yscrollcommand=self.vsb_pbpk.set)
+        
+        self.vsb_pbpk.pack(side=tk.RIGHT, fill=tk.Y)
+        self.canvas_pbpk.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        self.pbpk_grid_frame = ttk.Frame(self.canvas_pbpk)
+        self.canvas_pbpk.create_window((0, 0), window=self.pbpk_grid_frame, anchor=tk.NW)
+        
+        self.pbpk_grid = PBPKGrid(self.pbpk_grid_frame, rows=50)
+        self.pbpk_grid.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        self.pbpk_grid_frame.bind("<Configure>", lambda e: self.canvas_pbpk.configure(scrollregion=self.canvas_pbpk.bbox("all")))
+        
+        btn_bar = ttk.Frame(left_frame)
+        btn_bar.pack(fill=tk.X, pady=(5,0))
+        
+        btn = ttk.Button(btn_bar, text='+ Add Row', command=self.pbpk_grid.add_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '+ Add Row')
+        
+        btn = ttk.Button(btn_bar, text='- Del Row', command=self.pbpk_grid.del_row)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, '- Del Row')
+        
+        ttk.Separator(btn_bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=10)
+        
+        btn = ttk.Button(btn_bar, text='Generate 3D Distribution', command=self.generate_pbpk_3d)
+        btn.pack(side=tk.LEFT, padx=3)
+        add_tooltip(btn, 'Generate 3D Distribution')
+        
     def clear_volcano_data(self):
         for r in range(500):
             for c in range(3):
                 if (r, c) in self.volcano_grid.cells:
                     self.volcano_grid.cells[(r, c)].delete(0, tk.END)
+        
+    def clear_pkpd_data(self):
+        for r in range(self.pkpd_grid.rows):
+            for c in range(3):
+                if (r, c) in self.pkpd_grid.cells:
+                    self.pkpd_grid.cells[(r, c)].delete(0, tk.END)
+                    
+    def clear_pbpk_data(self):
+        for r in range(self.pbpk_grid.rows):
+            for c in range(3):
+                if (r, c) in self.pbpk_grid.cells:
+                    self.pbpk_grid.cells[(r, c)].delete(0, tk.END)
         
     def clear_group_data(self):
         for r in range(6):
@@ -1057,6 +1344,49 @@ class PharmaStatApp:
         
         win.show()
         
+    def generate_3d_bar_chart(self):
+        data = self.collect_data()
+        if not data:
+            messagebox.showwarning('警告', '请输入数据')
+            return
+            
+        stats_dict = self.calculate_stats(data)
+        
+        win = ChartWindow(f'{self.current_indicator.get()} - 3D柱状图', projection='3d')
+        ax = win.ax
+        
+        groups = [g for g in GROUP_ORDER if g in data]
+        x_pos = np.arange(len(groups))
+        means = [stats_dict[g]['mean'] for g in groups]
+        sems = [stats_dict[g]['sem'] for g in groups]
+        colors = [GROUP_COLORS[GROUP_ORDER.index(g)] for g in groups]
+        
+        dx = dy = 0.5
+        for i, (x, mean, sem, color) in enumerate(zip(x_pos, means, sems, colors)):
+            ax.bar3d(x, 0, 0, dx, dy, mean, color=color, edgecolor='black', linewidth=1.2, shade=True)
+            if sem > 0:
+                cx, cy = x + dx/2, dy/2
+                ax.plot([cx, cx], [cy, cy], [mean, mean+sem], color='black', linewidth=1.5)
+                cap = 0.15
+                ax.plot([cx-cap, cx+cap], [cy, cy], [mean+sem, mean+sem], color='black', linewidth=1.5)
+                ax.plot([cx, cx], [cy-cap, cy+cap], [mean+sem, mean+sem], color='black', linewidth=1.5)
+        
+        for i, group in enumerate(groups):
+            p_value = self.statistical_test(data, group)
+            marker = self.get_significance_marker(p_value)
+            if marker and group != 'Control':
+                cx = x_pos[i] + dx/2
+                cy = dy/2
+                max_val = stats_dict[group]['mean'] + stats_dict[group]['sem']
+                ax.text(cx, cy, max_val + sems[i]*0.3, marker, ha='center', va='bottom', fontsize=14, fontweight='bold')
+        
+        ax.set_xticks(x_pos + dx/2)
+        ax.set_xticklabels(groups, fontsize=11, rotation=15)
+        ax.set_zlabel(self.current_indicator.get(), fontsize=12)
+        ax.set_title(f'{self.current_indicator.get()} - 3D柱状图 (均值±SEM)', fontsize=14, fontweight='bold')
+        
+        win.show()
+        
     def generate_box_chart(self):
         data = self.collect_data()
         if not data:
@@ -1092,6 +1422,75 @@ class PharmaStatApp:
         ax.spines['top'].set_visible(False)
         ax.spines['right'].set_visible(False)
         ax.grid(axis='y', linestyle='--', alpha=0.3)
+        
+        win.show()
+        
+    def generate_pkpd_surface(self):
+        times, concs, effects = self.pkpd_grid.get_data()
+        if len(times) < 6:
+            messagebox.showwarning('警告', '请输入至少6组 Time-Concentration-Effect 数据')
+            return
+            
+        win = ChartWindow('PK/PD Surface', width=10, height=8, projection='3d')
+        ax = win.ax
+        
+        times = np.array(times)
+        concs = np.array(concs)
+        effects = np.array(effects)
+        
+        surf = ax.plot_trisurf(times, concs, effects, cmap='viridis', alpha=0.9,
+                                edgecolor='gray', linewidth=0.2, antialiased=True)
+        ax.scatter(times, concs, effects, c='red', s=40, depthshade=False, label='Observed Data')
+        
+        ax.set_xlabel('Time (h)', fontsize=11)
+        ax.set_ylabel('Concentration (ng/mL)', fontsize=11)
+        ax.set_zlabel('Effect (%)', fontsize=11)
+        ax.set_title(f'{self.pkpd_drug_var.get()} - PK/PD Time-Concentration-Effect Surface',
+                     fontsize=13, fontweight='bold')
+        
+        win.fig.colorbar(surf, ax=ax, shrink=0.6, aspect=15, label='Effect (%)')
+        ax.legend()
+        win.show()
+        
+    def generate_pbpk_3d(self):
+        tissues, times, concs = self.pbpk_grid.get_data()
+        if not tissues:
+            messagebox.showwarning('警告', '请输入 Tissue-Time-Concentration 数据')
+            return
+            
+        win = ChartWindow('PBPK 3D Distribution', width=10, height=8, projection='3d')
+        ax = win.ax
+        
+        unique_tissues = sorted(set(tissues))
+        tissue_map = {t: i for i, t in enumerate(unique_tissues)}
+        
+        x_pos = np.array([tissue_map[t] for t in tissues])
+        y_pos = np.array(times)
+        z_vals = np.array(concs)
+        
+        z_min, z_max = z_vals.min(), z_vals.max()
+        if z_max > z_min:
+            norm = plt.Normalize(z_min, z_max)
+            colors = plt.cm.plasma(norm(z_vals))
+        else:
+            colors = ['#2196F3'] * len(z_vals)
+        
+        dx = dy = 0.5
+        for x, y, z, c in zip(x_pos, y_pos, z_vals, colors):
+            ax.bar3d(x - dx/2, y - dy/2, 0, dx, dy, z, color=c, edgecolor='black', linewidth=0.3, shade=True)
+        
+        ax.set_xticks(range(len(unique_tissues)))
+        ax.set_xticklabels(unique_tissues, fontsize=10, rotation=30, ha='right')
+        ax.set_xlabel('Tissue / Organ', fontsize=11)
+        ax.set_ylabel('Time (h)', fontsize=11)
+        ax.set_zlabel('Concentration (ng/mL)', fontsize=11)
+        ax.set_title(f'{self.pbpk_drug_var.get()} - PBPK Tissue Distribution & Accumulation',
+                     fontsize=13, fontweight='bold')
+        
+        if z_max > z_min:
+            m = plt.cm.ScalarMappable(cmap=plt.cm.plasma, norm=plt.Normalize(z_min, z_max))
+            m.set_array(z_vals)
+            win.fig.colorbar(m, ax=ax, shrink=0.6, aspect=15, label='Concentration (ng/mL)')
         
         win.show()
         
@@ -1267,6 +1666,10 @@ class PharmaStatApp:
             self.load_heatmap_csv()
         elif current_tab == 4:
             self.load_volcano_csv()
+        elif current_tab == 5:
+            self.load_pkpd_csv()
+        elif current_tab == 6:
+            self.load_pbpk_csv()
     
     def load_group_csv(self):
         filename = filedialog.askopenfilename(filetypes=[('CSV文件', '*.csv'), ('所有文件', '*.*')])
@@ -1414,7 +1817,7 @@ class PharmaStatApp:
     
     def save_project_as(self):
         current_tab = self.notebook.index(self.notebook.select())
-        tab_names = ['Group', 'Dose-Response', 'Correlation', 'Heatmap', 'Volcano']
+        tab_names = ['Group', 'Dose-Response', 'Correlation', 'Heatmap', 'Volcano', 'PK/PD', 'PBPK']
         default_name = f'{tab_names[current_tab]}_project.csv'
         
         filename = filedialog.asksaveasfilename(
@@ -1438,6 +1841,10 @@ class PharmaStatApp:
             self.save_heatmap(filename)
         elif current_tab == 4:
             self.save_volcano(filename)
+        elif current_tab == 5:
+            self.save_pkpd(filename)
+        elif current_tab == 6:
+            self.save_pbpk(filename)
     
     def save_group(self, filename):
         data = self.collect_data()
@@ -1477,6 +1884,54 @@ class PharmaStatApp:
         if data:
             df = pd.DataFrame(data, columns=['Gene', 'log2FC', 'P-value'])
             df.to_csv(filename, index=False, encoding='utf-8-sig')
+    
+    def save_pkpd(self, filename):
+        times, concs, effects = self.pkpd_grid.get_data()
+        data = list(zip(times, concs, effects))
+        if data:
+            df = pd.DataFrame(data, columns=['Time', 'Concentration', 'Effect'])
+            df.to_csv(filename, index=False, encoding='utf-8-sig')
+    
+    def save_pbpk(self, filename):
+        tissues, times, concs = self.pbpk_grid.get_data()
+        data = list(zip(tissues, times, concs))
+        if data:
+            df = pd.DataFrame(data, columns=['Tissue', 'Time', 'Concentration'])
+            df.to_csv(filename, index=False, encoding='utf-8-sig')
+    
+    def load_pkpd_csv(self):
+        filename = filedialog.askopenfilename(filetypes=[('CSV文件', '*.csv'), ('所有文件', '*.*')])
+        if filename:
+            try:
+                df = pd.read_csv(filename)
+                if 'Time' in df.columns and 'Concentration' in df.columns and 'Effect' in df.columns:
+                    times = pd.to_numeric(df['Time'], errors='coerce').dropna().tolist()
+                    concs = pd.to_numeric(df['Concentration'], errors='coerce').dropna().tolist()
+                    effects = pd.to_numeric(df['Effect'], errors='coerce').dropna().tolist()
+                    self.pkpd_grid.set_data(times, concs, effects)
+                    self.tab_files[5] = filename
+                    messagebox.showinfo('成功', f'已导入 {filename}')
+                else:
+                    messagebox.showwarning('警告', 'CSV需要包含Time、Concentration和Effect列')
+            except Exception as e:
+                messagebox.showerror('错误', str(e))
+    
+    def load_pbpk_csv(self):
+        filename = filedialog.askopenfilename(filetypes=[('CSV文件', '*.csv'), ('所有文件', '*.*')])
+        if filename:
+            try:
+                df = pd.read_csv(filename)
+                if 'Tissue' in df.columns and 'Time' in df.columns and 'Concentration' in df.columns:
+                    tissues = df['Tissue'].astype(str).tolist()
+                    times = pd.to_numeric(df['Time'], errors='coerce').dropna().tolist()
+                    concs = pd.to_numeric(df['Concentration'], errors='coerce').dropna().tolist()
+                    self.pbpk_grid.set_data(tissues, times, concs)
+                    self.tab_files[6] = filename
+                    messagebox.showinfo('成功', f'已导入 {filename}')
+                else:
+                    messagebox.showwarning('警告', 'CSV需要包含Tissue、Time和Concentration列')
+            except Exception as e:
+                messagebox.showerror('错误', str(e))
     
     def _on_ctrl_s(self, event=None):
         self.save_project()
