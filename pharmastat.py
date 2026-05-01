@@ -1335,7 +1335,7 @@ class PharmaStatApp:
                                ha='center', va='bottom', fontsize=14, fontweight='bold')
         
         ax.set_xticks(x_pos)
-        ax.set_xticklabels(groups, fontsize=11, rotation=15)
+        ax.set_xticklabels(groups, fontsize=11, rotation=30, ha='right')
         ax.set_ylabel(self.current_indicator.get(), fontsize=12)
         ax.set_title(f'{self.current_indicator.get()} - 柱状图 (均值±SEM)', fontsize=14, fontweight='bold')
         ax.spines['top'].set_visible(False)
@@ -1381,7 +1381,7 @@ class PharmaStatApp:
                 ax.text(cx, cy, max_val + sems[i]*0.3, marker, ha='center', va='bottom', fontsize=14, fontweight='bold')
         
         ax.set_xticks(x_pos + dx/2)
-        ax.set_xticklabels(groups, fontsize=11, rotation=15)
+        ax.set_xticklabels(groups, fontsize=11, rotation=30, ha='right')
         ax.set_zlabel(self.current_indicator.get(), fontsize=12)
         ax.set_title(f'{self.current_indicator.get()} - 3D柱状图 (均值±SEM)', fontsize=14, fontweight='bold')
         
@@ -1416,7 +1416,7 @@ class PharmaStatApp:
                                ha='center', va='bottom', fontsize=14, fontweight='bold')
         
         ax.set_xticks(range(len(groups)))
-        ax.set_xticklabels(groups, fontsize=11, rotation=15)
+        ax.set_xticklabels(groups, fontsize=11, rotation=30, ha='right')
         ax.set_ylabel(self.current_indicator.get(), fontsize=12)
         ax.set_title(f'{self.current_indicator.get()} - 箱线图', fontsize=14, fontweight='bold')
         ax.spines['top'].set_visible(False)
@@ -1458,7 +1458,7 @@ class PharmaStatApp:
             messagebox.showwarning('警告', '请输入 Tissue-Time-Concentration 数据')
             return
             
-        win = ChartWindow('PBPK 3D Distribution', width=10, height=8, projection='3d')
+        win = ChartWindow('PBPK 3D Distribution', width=12, height=8, projection='3d')
         ax = win.ax
         
         unique_tissues = sorted(set(tissues))
@@ -1480,10 +1480,12 @@ class PharmaStatApp:
             ax.bar3d(x - dx/2, y - dy/2, 0, dx, dy, z, color=c, edgecolor='black', linewidth=0.3, shade=True)
         
         ax.set_xticks(range(len(unique_tissues)))
-        ax.set_xticklabels(unique_tissues, fontsize=10, rotation=30, ha='right')
-        ax.set_xlabel('Tissue / Organ', fontsize=11)
+        ax.set_xticklabels(unique_tissues, fontsize=8, rotation=45)
+        ax.set_xlabel('Tissue / Organ', fontsize=11, labelpad=15)
         ax.set_ylabel('Time (h)', fontsize=11)
         ax.set_zlabel('Concentration (ng/mL)', fontsize=11)
+        ax.tick_params(axis='x', pad=10)
+        ax.view_init(elev=30, azim=-55)
         ax.set_title(f'{self.pbpk_drug_var.get()} - PBPK Tissue Distribution & Accumulation',
                      fontsize=13, fontweight='bold')
         
@@ -1604,10 +1606,12 @@ class PharmaStatApp:
         
         df_heatmap = pd.DataFrame(data, index=row_labels, columns=col_labels)
         
-        sns.heatmap(df_heatmap, annot=True, fmt='.1f', cmap='coolwarm', 
+        sns.heatmap(df_heatmap, annot=True, fmt='.1f', cmap='coolwarm',
                     center=0, linewidths=1, linecolor='white',
                     ax=ax, cbar_kws={'shrink': 0.8})
-        
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right')
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0)
+
         ax.set_title('Heatmap', fontsize=14, fontweight='bold')
         
         win.show()
