@@ -4,11 +4,13 @@ Pharmaceutical data visualization and analysis tool with English UI and Chinese 
 
 ## Features
 
-- **Group Comparison**: Bar+Error bars, Boxplot with automatic t-test significance markers
+- **Group Comparison**: Bar+Error bars, 3D Bar, Boxplot with automatic t-test significance markers
 - **Dose-Response**: Sigmoid fitting, IC50/EC50 calculation
 - **Correlation**: Scatter plot with regression line, r-value and p-value
 - **Heatmap**: Data matrix heatmap visualization
 - **Volcano Plot**: Differential expression analysis for genomics
+- **PK/PD**: Time-Concentration-Effect 3D surface visualization
+- **PBPK**: Tissue distribution 3D bar chart for pharmacokinetic analysis
 - **Global Scroll**: Mouse wheel scrolling works across all tabs and input fields
 
 ## Visualization
@@ -16,6 +18,7 @@ Pharmaceutical data visualization and analysis tool with English UI and Chinese 
 - Matplotlib - Base plotting
 - Seaborn - Statistical visualization with beautiful themes
 - SciencePlots - Academic journal style
+- 3D plots via mpl_toolkits.mplot3d
 
 ## Installation
 
